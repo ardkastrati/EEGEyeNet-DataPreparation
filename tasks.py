@@ -1,7 +1,33 @@
-from data_preparation.preparator import Preparator
+from preparator import Preparator
 from preparation_config import preparation_config as config
 import numpy as np
 
+def yes_no_task_data_preparation(feature_extraction = False, verbose=False):
+    '''data preparation for the yes / no task based on synchronized EEG (EEGs) and the recorded events where we filter for yes / no events.
+
+    Results
+    --------
+        Saves prepared dataset as .npz file to the indicated saving directory. 
+    '''
+    if not feature_extraction:
+
+        preparator = Preparator(load_directory     = config['LOAD_WISC_PATH'] ,
+                                save_directory     = config['SAVE_PATH'],
+                                load_file_pattern  = config['WISC_FILE_PATTERN'],
+                                save_file_name     = config['output_name'], verbose=verbose)
+                                
+        preparator.extract_data_at_events( extract_pattern = [], name_start_time='',
+                                           start_time = lambda events: events['latency'],
+                                           name_length_time = ' Size blocks of 500', length_time = 500,
+                                           start_channel    = 1, end_channel = 134, 
+                                           padding = False)
+
+        # We filter for yes or no events, only take the correct predictions and recode the labeling
+        preparator.addFilter( name = 'Filter Yes or No events',             f=lambda events: (events['type'] == 'answer_wisc'))
+        preparator.addFilter( name = 'Only take the correct predictions',   f=lambda events: (events['evaulation_wisc'] == 'CORRECT'))
+        preparator.addLabel(  name = 'Giving label 0 for No and 1 for Yes', f=lambda events: events['response_wisc'].apply(lambda x: 0 if x == 'NO' else 1))      
+        preparator.run()    
+        
 
 def left_right_task_data_preparation(feature_extraction = False, verbose=False):
     # We use the antisaccade dataset to extract the data for left and right benchmark task.
@@ -153,6 +179,9 @@ def main():
 
     elif config['task'] == 'Segmentation_task':
         segmentation_task_data_preparation(config['feature_extraction'])
+
+    elif config['task'] == 'Yes_No_task':
+        yes_no_task_data_preparation(config['feature_extraction'])
 
     else:
         raise NotImplementedError("Task " + config['task'] + " is not implemented yet.")
